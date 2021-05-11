@@ -1,0 +1,5 @@
+*.pth
+*.pyc
+/dataset/test
+/dataset/raw-img
+/dataset/train
