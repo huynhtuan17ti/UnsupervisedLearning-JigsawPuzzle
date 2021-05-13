@@ -5,6 +5,9 @@ import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from PIL import Image
+from config import Config
+
+cfg = Config()
 
 def rgb_jittering(im):
     im = np.array(im, 'int32')
@@ -14,13 +17,41 @@ def rgb_jittering(im):
     im[im < 0] = 0
     return im.astype('uint8')
 
-def get_all_imgs(data_path):
+def get_all_imgs(data_path, return_label = False):
     imgs = []
     for obj in os.listdir(data_path):
         obj_path = os.path.join(data_path, obj)
         for img in os.listdir(obj_path):
-            imgs.append(os.path.join(obj_path, img))
+            if return_label:
+                imgs.append((os.path.join(obj_path, img), obj))
+            else:
+                imgs.append(os.path.join(obj_path, img))
     return imgs
+
+class AnimalDataset(data.Dataset):
+    def __init__(self, data_path, classes = 10):
+        self.data = data_path
+
+        self.image_transformer = transforms.Compose([
+            transforms.Resize(256, Image.BILINEAR),
+            transforms.CenterCrop(255),
+            transforms.ToTensor(),
+            transforms.Normalize(mean = [0.485, 0.456, 0.406], 
+                                std=[0.229, 0.224, 0.225])])
+    
+    def __len__(self):
+        return len(self.data)
+
+
+    def __getitem__(self, index):
+        filename, label = self.data[index]
+
+        img = Image.open(filename).convert('RGB')
+
+        img = self.image_transformer(img)
+
+        return img, int(cfg.label_dict[label])
+
 
 class JigsawDataset(data.Dataset):
     def __init__(self, data_path, classes = 1000):

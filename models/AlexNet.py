@@ -1,93 +1,29 @@
-'''
-    https://github.com/bbrattoli/JigsawPuzzlePytorch/blob/master/JigsawNetwork.py
-'''
-
 import torch
-import os
 import torch.nn as nn
-from torch import cat
-import torch.utils.model_zoo as model_zoo
+from torchvision import models
 
-
-__all__ = ['AlexNet', 'alexnet']
-
-class LRN(nn.Module):
-    def __init__(self, local_size=1, alpha=1.0, beta=0.75, ACROSS_CHANNELS=True):
-        super(LRN, self).__init__()
-        self.ACROSS_CHANNELS = ACROSS_CHANNELS
-        if ACROSS_CHANNELS:
-            self.average=nn.AvgPool3d(kernel_size=(local_size, 1, 1),
-                    stride=1,
-                    padding=(int((local_size-1.0)/2), 0, 0))
-        else:
-            self.average=nn.AvgPool2d(kernel_size=local_size,
-                    stride=1,
-                    padding=int((local_size-1.0)/2))
-        self.alpha = alpha
-        self.beta = beta
-
-
-    def forward(self, x):
-        if self.ACROSS_CHANNELS:
-            div = x.pow(2).unsqueeze(1)
-            div = self.average(div).squeeze(1)
-            div = div.mul(self.alpha).add(1.0).pow(self.beta)
-        else:
-            div = x.pow(2)
-            div = self.average(div)
-            div = div.mul(self.alpha).add(1.0).pow(self.beta)
-        x = x.div(div)
-        return x
 
 class JigsawAlexNet(nn.Module):
 
     def __init__(self, classes=1000):
         super(JigsawAlexNet, self).__init__()
 
-        self.conv = nn.Sequential()
-        self.conv.add_module('conv1_s1',nn.Conv2d(3, 96, kernel_size=11, stride=2, padding=0))
-        self.conv.add_module('relu1_s1',nn.ReLU(inplace=True))
-        self.conv.add_module('pool1_s1',nn.MaxPool2d(kernel_size=3, stride=2))
-        self.conv.add_module('lrn1_s1',LRN(local_size=5, alpha=0.0001, beta=0.75))
+        self.conv = models.alexnet(pretrained = True).features
+        self.conv._modules['0'] = nn.Conv2d(3, 64, kernel_size=11, stride=2, padding=2) # modified to stride 2
+        self.fc6 = nn.Sequential(
+            nn.Linear(256*3*3, 1024),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5)
+        )
+        self.fc7 = nn.Sequential(
+            nn.Linear(9*1024,4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5)
+        )
 
-        self.conv.add_module('conv2_s1',nn.Conv2d(96, 256, kernel_size=5, padding=2, groups=2))
-        self.conv.add_module('relu2_s1',nn.ReLU(inplace=True))
-        self.conv.add_module('pool2_s1',nn.MaxPool2d(kernel_size=3, stride=2))
-        self.conv.add_module('lrn2_s1',LRN(local_size=5, alpha=0.0001, beta=0.75))
-
-        self.conv.add_module('conv3_s1',nn.Conv2d(256, 384, kernel_size=3, padding=1))
-        self.conv.add_module('relu3_s1',nn.ReLU(inplace=True))
-
-        self.conv.add_module('conv4_s1',nn.Conv2d(384, 384, kernel_size=3, padding=1, groups=2))
-        self.conv.add_module('relu4_s1',nn.ReLU(inplace=True))
-
-        self.conv.add_module('conv5_s1',nn.Conv2d(384, 256, kernel_size=3, padding=1, groups=2))
-        self.conv.add_module('relu5_s1',nn.ReLU(inplace=True))
-        self.conv.add_module('pool5_s1',nn.MaxPool2d(kernel_size=3, stride=2))
-
-        self.fc6 = nn.Sequential()
-        self.fc6.add_module('fc6_s1',nn.Linear(256*3*3, 1024))
-        self.fc6.add_module('relu6_s1',nn.ReLU(inplace=True))
-        self.fc6.add_module('drop6_s1',nn.Dropout(p=0.5))
-
-        self.fc7 = nn.Sequential()
-        self.fc7.add_module('fc7',nn.Linear(9*1024,4096))
-        self.fc7.add_module('relu7',nn.ReLU(inplace=True))
-        self.fc7.add_module('drop7',nn.Dropout(p=0.5))
-
-        self.classifier = nn.Sequential()
-        self.classifier.add_module('fc8',nn.Linear(4096, classes))
-
-    def load(self, checkpoint):
-        model_dict = self.state_dict()
-        pretrained_dict = torch.load(checkpoint)
-        pretrained_dict = {k: v for k, v in list(pretrained_dict.items()) if k in model_dict and 'fc8' not in k}
-        model_dict.update(pretrained_dict)
-        self.load_state_dict(model_dict)
-        print([k for k, v in list(pretrained_dict.items())])
-
-    def save(self,checkpoint):
-        torch.save(self.state_dict(), checkpoint)
+        self.classifier = nn.Sequential(
+            nn.Linear(4096, classes)
+        )
 
     def forward(self, x):
         B, T, C, H, W = x.size()
@@ -100,12 +36,46 @@ class JigsawAlexNet(nn.Module):
             z = z.view([B,1,-1])
             x_list.append(z)
 
-        x = cat(x_list,1)
+        x = torch.cat(x_list,1)
         x = self.fc7(x.view(B,-1))
         x = self.classifier(x)
 
         return x
 
+class AlexNet(nn.Module):
+    def __init__(self, classes = 10):
+        super(AlexNet, self).__init__()
+        self.conv = models.alexnet(pretrained = True).features
+        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(256 * 6 * 6, 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+            nn.Linear(4096, classes),
+        )
+
+    def load(self, checkpoint):
+        model_dict = self.state_dict()
+        pretrained_dict = torch.load(checkpoint)
+        pretrained_dict = {k: v for k, v in list(pretrained_dict.items()) if k in model_dict}
+        model_dict.update(pretrained_dict)
+        self.load_state_dict(model_dict)
+        print([k for k, v in list(pretrained_dict.items())])
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+
+
 if __name__ == '__main__':
+    # testing
     net = JigsawAlexNet().cuda()
-    print(net)
+    from torchsummary import summary
+    print(summary(net, (9, 3, 75, 75)))
+    #print(net)
