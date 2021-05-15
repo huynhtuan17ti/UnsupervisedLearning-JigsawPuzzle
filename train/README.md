@@ -4,6 +4,6 @@ Training CFN model from scratch
 ## Train classifier model  
 Using CFN weights to initialize all conv leayers of the standard model  
 `$user train_classifier.sh`  
-## Train Jigsaw model  
+## Transfer learning    
 Using pretrained weight of standard model on ImageNet  
-`$user train_jigsaw.sh`  
+`$user train_transfer.sh`  
