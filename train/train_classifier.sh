@@ -1,3 +1,2 @@
-pretrained_path = '../UnsupervisedLearning-JigsawPuzzle/save_model/Jigsaw_Alexnet.pth'
-checkpoint_path = '../UnsupervisedLearning-JigsawPuzzle/save_model/Alexnet.pth'
-python train_classifier.py --pretrained ${pretrained_path} --checkpoint ${checkpoint_path} 
+#!/bin/bash
+python train/train_classifier.py --pretrained '../UnsupervisedLearning-JigsawPuzzle/save_model/Jigsaw_Alexnet.pth' --checkpoint '../UnsupervisedLearning-JigsawPuzzle/save_model/Alexnet.pth'

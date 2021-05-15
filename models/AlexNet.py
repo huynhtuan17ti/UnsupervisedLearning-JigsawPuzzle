@@ -32,7 +32,7 @@ class LRN(nn.Module):
 
 class JigsawAlexNet(nn.Module):
 
-    def __init__(self, classes=1000):
+    def __init__(self, classes=100):
         super(JigsawAlexNet, self).__init__()
 
         self.conv = nn.Sequential(
@@ -90,7 +90,26 @@ class JigsawAlexNet(nn.Module):
 class AlexNet(nn.Module):
     def __init__(self, classes = 10):
         super(AlexNet, self).__init__()
-        self.conv = models.alexnet(pretrained = True).features
+        self.conv = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+
+            nn.Conv2d(64, 192, kernel_size=5, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+
+            nn.Conv2d(192, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        )
         self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
         self.classifier = nn.Sequential(
             nn.Dropout(),

@@ -16,6 +16,7 @@ import math
 from metric import accuracy as acc_metric
 from tqdm import tqdm
 from train.train_utils import prepare_dataloader
+from torchvision import models
 import argparse
 
 parser = argparse.ArgumentParser(description='Train JigsawPuzzle Classifer')
@@ -91,13 +92,12 @@ def valid_one_epoch(epoch, net, valid_loader, loss_fc):
 if __name__ == '__main__':
     train_loader, valid_loader = prepare_dataloader(AnimalDataset, args.train_csv, args.valid_csv, args.train_batch, args.valid_batch)
 
-    net = AlexNet().cuda()
-    if args.pretrained:
-        net.load(args.pretrained)
-        for parameter in net.conv.parameters():
-            parameter.requires_grad = False
-        print('Load pretrained model successfully!')
+    net = models.alexnet(pretrained = True)
+    num_ftrs = net.classifier[6].in_features
+    net.classifier[6] = nn.Linear(num_ftrs, 10)
     
+    net.cuda()
+
     loss = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, net.parameters()), lr = args.lr, momentum=0.9, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.period, args.gamma, verbose = True)

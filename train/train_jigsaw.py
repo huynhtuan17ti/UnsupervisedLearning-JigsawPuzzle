@@ -8,13 +8,13 @@ import os
 import cv2
 from torch.autograd import Variable
 from dataset_factory.data_loader import JigsawDataset
-from dataset_factory.data_utils import get_all_imgs
+from dataset_factory import data_utils
 from models.AlexNet import JigsawAlexNet
 from config import Config
 import math
 from metric import accuracy as acc_metric
 from tqdm import tqdm
-from .train_utils import prepare_dataloader
+from train.train_utils import prepare_dataloader
 import argparse
 
 parser = argparse.ArgumentParser(description='Train JigsawPuzzle Classifer')
@@ -28,6 +28,8 @@ parser.add_argument('--valid_csv', default='../UnsupervisedLearning-JigsawPuzzle
 parser.add_argument('--epochs', default=200, type=int, help='number of total epochs for training')
 parser.add_argument('--train_batch', default=16, type=int, help='train batch size')
 parser.add_argument('--valid_batch', default=16, type=int, help='valid batch size')
+parser.add_argument('--init_acc', default=0, type=float, help='initial accuracy for training')
+parser.add_argument('--result', default=None, type=str, help='Path to save result log')
 
 args = parser.parse_args()
 
@@ -100,10 +102,12 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(net.parameters(), lr = args.lr, momentum=0.9, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.period, args.gamma, verbose = True)
 
+    if args.result:
+        f = open(args.result, "w")
     # training
     print('='*30)
     print('Start training ...')
-    best_acc = 0
+    best_acc = args.init_acc
     for epoch in range(args.epochs):
         train_one_epoch(epoch, net, train_loader, loss, optimizer)
         with torch.no_grad():
@@ -112,4 +116,8 @@ if __name__ == '__main__':
                 best_acc = acc
                 torch.save(net.state_dict(), args.checkpoint)
                 print('Save checkpoint ... Best accuracy {:.3f}'.format(best_acc))
+                if args.result:
+                    f.write("Epoch: " + str(epoch) + ', best acc save: ' + str(best_acc) + '\n')
         scheduler.step()
+    if args.result:
+        f.close()

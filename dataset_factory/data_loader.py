@@ -6,7 +6,7 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 from PIL import Image
 from config import Config
-from .data_utils import get_all_imgs, rgb_jittering
+from .data_utils import rgb_jittering
 
 cfg = Config()
 
@@ -36,7 +36,7 @@ class AnimalDataset(data.Dataset):
 
 
 class JigsawDataset(data.Dataset):
-    def __init__(self, data_path, classes = 1000):
+    def __init__(self, data_path, classes = 100):
         self.data = data_path
 
         self.permutations = self.get_permutations(classes)

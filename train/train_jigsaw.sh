@@ -1,2 +1,2 @@
-checkpoint_path = '../UnsupervisedLearning-JigsawPuzzle/save_model/Jigsaw_Alexnet.pth'
-python train_jigsaw.py --checkpoint ${checkpoint_path} 
+#!/bin/bash
+python train/train_jigsaw.py --checkpoint '../UnsupervisedLearning-JigsawPuzzle/save_model/Jigsaw_Alexnet.pth' --result '../UnsupervisedLearning-JigsawPuzzle/train/result/train_log_classifier.txt'
