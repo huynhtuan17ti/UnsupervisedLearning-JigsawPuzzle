@@ -6,27 +6,9 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 from PIL import Image
 from config import Config
+from .data_utils import get_all_imgs, rgb_jittering
 
 cfg = Config()
-
-def rgb_jittering(im):
-    im = np.array(im, 'int32')
-    for ch in range(3):
-        im[:, :, ch] += np.random.randint(-2, 2)
-    im[im > 255] = 255
-    im[im < 0] = 0
-    return im.astype('uint8')
-
-def get_all_imgs(data_path, return_label = False):
-    imgs = []
-    for obj in os.listdir(data_path):
-        obj_path = os.path.join(data_path, obj)
-        for img in os.listdir(obj_path):
-            if return_label:
-                imgs.append((os.path.join(obj_path, img), obj))
-            else:
-                imgs.append(os.path.join(obj_path, img))
-    return imgs
 
 class AnimalDataset(data.Dataset):
     def __init__(self, data_path, classes = 10):
@@ -55,7 +37,7 @@ class AnimalDataset(data.Dataset):
 
 class JigsawDataset(data.Dataset):
     def __init__(self, data_path, classes = 1000):
-        self.imgs = data_path
+        self.data = data_path
 
         self.permutations = self.get_permutations(classes)
 
@@ -71,10 +53,10 @@ class JigsawDataset(data.Dataset):
         ])
 
     def __len__(self):
-        return len(self.imgs)
+        return len(self.data)
     
     def __getitem__(self, index):
-        filename = self.imgs[index]
+        filename, _ = self.data[index]
 
         img = Image.open(filename).convert('RGB')
         if np.random.rand() < 0.30:

@@ -1,6 +1,10 @@
 class Config(object):
     train_path = '../UnsupervisedLearning-JigsawPuzzle/dataset/train'
     test_path = '../UnsupervisedLearning-JigsawPuzzle/dataset/test'
+
+    train_csv = '../UnsupervisedLearning-JigsawPuzzle/dataset/csv/train.csv'
+    valid_csv = '../UnsupervisedLearning-JigsawPuzzle/dataset/csv/valid.csv'
+
     pretrain = True # set True if you want to use pretrained weight
     pretrained_path = '../UnsupervisedLearning-JigsawPuzzle/model_architecture/alexnet_jigsaw_in1k_pretext.pkl'
 
@@ -17,9 +21,12 @@ class Config(object):
     train_batch = 64
     valid_batch = 64
 
-    lr = 2e-3
+    lr = 3e-4
 
-    num_epochs = 200
+    num_epochs = 300
+
+    optimizer = "SGD"
 
     scheduler = 'step'
-    milestones = [30, 60]
+    milestones = [30, 60] #multiLR
+    gamma_period = 20

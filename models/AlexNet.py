@@ -2,14 +2,59 @@ import torch
 import torch.nn as nn
 from torchvision import models
 
+class LRN(nn.Module):
+    def __init__(self, local_size=1, alpha=1.0, beta=0.75, ACROSS_CHANNELS=True):
+        super(LRN, self).__init__()
+        self.ACROSS_CHANNELS = ACROSS_CHANNELS
+        if ACROSS_CHANNELS:
+            self.average=nn.AvgPool3d(kernel_size=(local_size, 1, 1),
+                    stride=1,
+                    padding=(int((local_size-1.0)/2), 0, 0))
+        else:
+            self.average=nn.AvgPool2d(kernel_size=local_size,
+                    stride=1,
+                    padding=int((local_size-1.0)/2))
+        self.alpha = alpha
+        self.beta = beta
+
+
+    def forward(self, x):
+        if self.ACROSS_CHANNELS:
+            div = x.pow(2).unsqueeze(1)
+            div = self.average(div).squeeze(1)
+            div = div.mul(self.alpha).add(1.0).pow(self.beta)
+        else:
+            div = x.pow(2)
+            div = self.average(div)
+            div = div.mul(self.alpha).add(1.0).pow(self.beta)
+        x = x.div(div)
+        return x
 
 class JigsawAlexNet(nn.Module):
 
     def __init__(self, classes=1000):
         super(JigsawAlexNet, self).__init__()
 
-        self.conv = models.alexnet(pretrained = True).features
-        self.conv._modules['0'] = nn.Conv2d(3, 64, kernel_size=11, stride=2, padding=2) # modified to stride 2
+        self.conv = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=11, stride=2, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+
+            nn.Conv2d(64, 192, kernel_size=5, padding=2),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=3, stride=2),
+
+            nn.Conv2d(192, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+
+            nn.MaxPool2d(kernel_size=3, stride=2),
+        )
         self.fc6 = nn.Sequential(
             nn.Linear(256*3*3, 1024),
             nn.ReLU(inplace=True),
@@ -58,6 +103,7 @@ class AlexNet(nn.Module):
         )
 
     def load(self, checkpoint):
+        print('Load pretrained weight from', checkpoint)
         model_dict = self.state_dict()
         pretrained_dict = torch.load(checkpoint)
         pretrained_dict = {k: v for k, v in list(pretrained_dict.items()) if k in model_dict}

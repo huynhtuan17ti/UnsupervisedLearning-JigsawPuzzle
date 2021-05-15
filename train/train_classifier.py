@@ -1,43 +1,43 @@
+import sys
+sys.path.insert(1, '../UnsupervisedLearning-JigsawPuzzle')
+
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+
 import torchvision
 import os
 import cv2
 from torch.autograd import Variable
-from dataset_factory.data_loader import get_all_imgs, JigsawDataset
-from models.AlexNet import JigsawAlexNet
+from dataset_factory.data_loader import AnimalDataset
+from dataset_factory.data_utils import get_all_imgs
+from models.AlexNet import AlexNet
 from config import Config
 import math
 from metric import accuracy as acc_metric
 from tqdm import tqdm
+from .train_utils import prepare_dataloader
+import argparse
 
-cfg = Config()
+parser = argparse.ArgumentParser(description='Train JigsawPuzzle Classifer')
+parser.add_argument('--lr', default=0.001, type=float, help='learning rate for SGD optimizer')
+parser.add_argument('--gamma', default=0.3, type=float, help='gamma for StepLR')
+parser.add_argument('--period', default=30, type=int, help='period range for StepLR')
+parser.add_argument('--pretrained', default=None, type=str, help='Path to pretrained model')
+parser.add_argument('--checkpoint', default=None, type=str, help='Path to save checkpoint model')
+parser.add_argument('--train_csv', default='../UnsupervisedLearning-JigsawPuzzle/dataset/csv/train.csv', type=str, help='Path to train.csv')
+parser.add_argument('--valid_csv', default='../UnsupervisedLearning-JigsawPuzzle/dataset/csv/valid.csv', type=str, help='Path to valid.csv')
+parser.add_argument('--epochs', default=200, type=int, help='number of total epochs for training')
+parser.add_argument('--train_batch', default=16, type=int, help='train batch size')
+parser.add_argument('--valid_batch', default=16, type=int, help='valid batch size')
 
-def prepare_dataloader():
-    labeled_img = get_all_imgs(cfg.train_path)
-    print('Found {} images in labeled set'.format(len(labeled_img)))
-
-    train_sz = math.ceil(len(labeled_img)*(1 - cfg.valid_ratio))
-    train_img, valid_img = labeled_img[:train_sz], labeled_img[train_sz:]
-
-    print('Train set: {} images'.format(len(train_img)))
-    print('Valid set: {} images'.format(len(valid_img)))
-
-    train_ds = JigsawDataset(train_img)
-    valid_ds = JigsawDataset(valid_img)
-
-    train_loader = DataLoader(train_ds, batch_size=cfg.train_batch, shuffle=True)
-    valid_loader = DataLoader(valid_ds, batch_size=cfg.valid_batch)
-
-    return train_loader, valid_loader
+args = parser.parse_args()
 
 def train_one_epoch(epoch, net, train_loader, loss_fc, optimizer):
     net.train()
     total_loss = 0
     total_acc = 0
     pbar = tqdm(enumerate(train_loader), total = len(train_loader))
-    for step, (images, labels, orginal) in pbar:
+    for step, (images, labels) in pbar:
         images = Variable(images).cuda()
         labels = Variable(labels).cuda()
 
@@ -47,11 +47,7 @@ def train_one_epoch(epoch, net, train_loader, loss_fc, optimizer):
         preds = torch.argmax(outputs, 1).detach().cpu().numpy()
         targets = labels.detach().cpu().numpy()
 
-        # print(preds)
-        # print(targets)
-
         acc = (preds == targets).mean()*100
-        # print("acc: ", acc)
 
         loss = loss_fc(outputs, labels)
         loss.backward()
@@ -69,7 +65,7 @@ def valid_one_epoch(epoch, net, valid_loader, loss_fc):
     total_acc = 0
 
     pbar = tqdm(enumerate(valid_loader), total = len(valid_loader))
-    for step, (images, labels, orginal) in pbar:
+    for step, (images, labels) in pbar:
         images = Variable(images).cuda()
         labels = Variable(labels).cuda()
 
@@ -79,8 +75,6 @@ def valid_one_epoch(epoch, net, valid_loader, loss_fc):
         targets = labels.detach().cpu().numpy()
 
         acc = (preds == targets).mean()*100
-
-        # prec1 = acc_metric.compute_accuracy(outputs.cpu().data, labels.cpu().data, topk=(1, 5))
 
         loss = loss_fc(outputs, labels)
 
@@ -92,33 +86,30 @@ def valid_one_epoch(epoch, net, valid_loader, loss_fc):
     
     return total_acc/(step+1)
 
-
 if __name__ == '__main__':
-    train_loader, valid_loader = prepare_dataloader()
+    train_loader, valid_loader = prepare_dataloader(AnimalDataset, args.train_csv, args.valid_csv, args.train_batch, args.valid_batch)
 
-    net = JigsawAlexNet().cuda()
-    if cfg.pretrain:
-        net.load_state_dict(torch.load(cfg.checkpoint_path))
+    net = AlexNet().cuda()
+    if args.pretrained:
+        net.load(args.pretrained)
+        for parameter in net.conv.parameters():
+            parameter.requires_grad = False
         print('Load pretrained model successfully!')
     
     loss = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr = cfg.lr, momentum=0.9, weight_decay=5e-4)
-    scheduler = None
-    if "multi" in cfg.scheduler:
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, cfg.milestones, gamma = 0.1, verbose = True)
-    else:
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 50, 0.3, verbose = True)
+    optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, net.parameters()), lr = args.lr, momentum=0.9, weight_decay=5e-4)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.period, args.gamma, verbose = True)
 
     # training
     print('='*30)
     print('Start training ...')
     best_acc = 0
-    for epoch in range(cfg.num_epochs):
+    for epoch in range(args.epochs):
         train_one_epoch(epoch, net, train_loader, loss, optimizer)
         with torch.no_grad():
             acc = valid_one_epoch(epoch, net, valid_loader, loss)
             if acc > best_acc:
                 best_acc = acc
-                torch.save(net.state_dict(), cfg.checkpoint_path)
+                torch.save(net.state_dict(), args.checkpoint)
                 print('Save checkpoint ... Best accuracy {:.3f}'.format(best_acc))
         scheduler.step()
