@@ -1,3 +1,7 @@
 # UnsupervisedLearning-JigsawPuzzle
 Implementation of paper "Unsupervised Learning of Visual Representations by Solving Jigsaw Puzzles"  
-## Install  
+## To do list  
+- [x] Project resource  
+- [ ] Training result  
+- [ ] Optimize result  
+- [ ] Demo  
